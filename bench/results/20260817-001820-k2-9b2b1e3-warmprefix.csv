@@ -1,0 +1,5 @@
+answer,cached_tokens,engine,error,phase,prompt_tokens,target_tokens,timestamp_utc,wall_s
+The log consists of the same four senten,0,k2-9b2b1e3,,cold,64943,92000,2026-08-16T18:34:02.318339+00:00,75.2
+"Based on the log, the reports were filed",64768,k2-9b2b1e3,,warm,64941,92000,2026-08-16T18:34:24.910678+00:00,22.6
+,,k2-9b2b1e3,timed out,cold,,370000,2026-08-16T23:18:11.293584+00:00,
+"Based on the log, the reports were filed",258048,k2-9b2b1e3,,warm,261126,370000,2026-08-16T23:18:20.147201+00:00,8.8

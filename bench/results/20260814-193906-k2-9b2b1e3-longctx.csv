@@ -1,0 +1,2 @@
+answer,completion_tokens,engine,needle_found,prefill_tok_s_approx,prompt_tokens,target_tokens,timestamp_utc,token_source,wall_s
+ZX967681Q,5,k2-9b2b1e3,True,735.4,993735,1408000,2026-08-14T14:09:06.765343+00:00,usage,1351.3

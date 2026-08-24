@@ -1,0 +1,5 @@
+answer,completion_tokens,engine,needle_found,prefill_tok_s_approx,prompt_tokens,target_tokens,timestamp_utc,token_source,wall_s
+ZX757975Q,5,tp2-mia-1m,True,2211.3,92473,131000,2026-08-22T21:25:57.197612+00:00,usage,41.8
+ZX533681Q,5,tp2-mia-1m,True,1760.9,369838,524000,2026-08-22T21:29:27.242868+00:00,usage,210.0
+ZX699714,4,tp2-mia-1m,False,1132.2,705792,1000000,2026-08-22T21:39:50.673617+00:00,usage,623.4
+ZX489679Q,5,tp2-mia-1m,True,954.4,993735,1408000,2026-08-22T21:57:11.894945+00:00,usage,1041.2

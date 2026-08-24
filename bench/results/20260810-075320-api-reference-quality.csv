@@ -1,0 +1,15 @@
+scenario,category,passes,repeats,pass_rate,fail_sample
+json-ticket,json,3,3,1.0,
+json-invoice,json,0,3,0.0,"{""total_cents"": 925, ""currency"": ""USD"", ""line_items"": [{""name"": ""Coffee"", ""cents"": 350}, {""name"": ""Coffee"", ""cents"": 350}, {""name"": ""Bagel"", ""cents"": 225}]}"
+json-nested,json,3,3,1.0,
+tool-plan,tool,3,3,1.0,
+tool-choice,tool,3,3,1.0,
+tool-multi,tool,0,3,0.0,ERROR 'str' object has no attribute 'get'
+exact-arith,exact,3,3,1.0,
+exact-sort,exact,3,3,1.0,
+exact-capital,exact,3,3,1.0,
+exact-datemath,exact,3,3,1.0,
+exact-hex,exact,3,3,1.0,
+exact-regex,exact,3,3,1.0,
+needle-4000,needle,3,3,1.0,
+needle-16000,needle,3,3,1.0,

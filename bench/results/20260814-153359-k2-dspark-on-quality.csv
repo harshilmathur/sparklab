@@ -1,0 +1,15 @@
+scenario,category,passes,repeats,pass_rate,fail_sample
+json-ticket,json,3,3,1.0,
+json-invoice,json,0,3,0.0,"{""total_cents"": 925, ""currency"": ""USD"", ""line_items"": [{""name"": ""coffee"", ""cents"": 350}, {""name"": ""coffee"", ""cents"": 350}, {""name"": ""bagel"", ""cents"": 225}]}"
+json-nested,json,3,3,1.0,
+tool-plan,tool,1,3,0.333,"[""run_shell"", {""cmd"": ""echo 'DONE' >> /tmp/status.txt""}]"
+tool-choice,tool,0,3,0.0,"{""tool"": ""calculator"", ""args"": {""expression"": ""2840 * 0.175""}}"
+tool-multi,tool,2,3,0.667," ""Tokyo"", ""2026-09-10""] [""book_hotel"", ""Tokyo"", ""2026-09-10"", ""3""] [""notify"", ""Travel arranged: flight Delhi→Tokyo on 2026-09-10, hotel in Tokyo for 3 nights.""]"
+exact-arith,exact,3,3,1.0,
+exact-sort,exact,3,3,1.0,
+exact-capital,exact,3,3,1.0,
+exact-datemath,exact,3,3,1.0,
+exact-hex,exact,3,3,1.0,
+exact-regex,exact,3,3,1.0,
+needle-4000,needle,3,3,1.0,
+needle-16000,needle,3,3,1.0,

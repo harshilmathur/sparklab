@@ -1,0 +1,1 @@
+Write a single PostgreSQL query. Schema: orders(id, customer_id, placed_at timestamptz, total_cents int, status text), customers(id, name, region text). Return the top 5 regions by revenue from completed orders in the last 90 days, with region, revenue in dollars rounded to 2 places, order count, and average order value. Reply with only the SQL in one fenced block.

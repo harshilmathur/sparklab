@@ -1,0 +1,31 @@
+{
+  "base_url": "http://127.0.0.1:8888/v1",
+  "cases": [
+    {
+      "aggregate_tok_s": 61.85937023170416,
+      "concurrency": 1,
+      "elapsed_s": 10.44304197699239,
+      "max_tokens": 2048,
+      "median_output_tok_s": 63.978566383259455,
+      "median_prefill_tok_s": 1548.6331748939497,
+      "median_ttft_s": 0.3454659300041385,
+      "requests": [
+        {
+          "elapsed_s": 10.44259746199532,
+          "finish_reason": "stop",
+          "output_tok_s": 63.978566383259455,
+          "output_tokens": 646,
+          "prefill_tok_s": 1548.6331748939497,
+          "prompt_tokens": 535,
+          "truncated": false,
+          "ttft_s": 0.3454659300041385
+        }
+      ],
+      "target_prompt_tokens": 512,
+      "thinking_token_budget": null,
+      "truncated_requests": 0
+    }
+  ],
+  "max_tokens": 2048,
+  "model": "deepseek-v4-flash-dspark"
+}
