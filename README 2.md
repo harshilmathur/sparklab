@@ -25,7 +25,6 @@ on real hardware, and the operational laws we learned the hard way.
 |---|---|---|
 | Single-stream decode (C1) | **65.8 tok/s** | TP=2, official FP8, DSpark k=5 (median-of-3) |
 | Peak aggregate | **136.5 tok/s** | two independent replicas, 12 streams each |
-| TP=2 aggregate | 59.3 tok/s | C12 (seqs-12 config's ceiling; C8 underfeeds it) |
 | One-box aggregate | 69.1 tok/s | llama.cpp, slots = concurrency, spec off |
 | One-box C1 | 54.1 tok/s | EXL3 ~2-bit, tuned CUDA-graph captures |
 | Warm prefill @32K | ~2,600 tok/s | TP=2 (cold first-touch is 30–60% slower) |

@@ -6,6 +6,8 @@ Everything below was measured, not assumed; evidence lives in
 ## Verified performance laws (RESULTS-LOG.md has the evidence)
 
 - Box record 69.1 tok/s aggregate (llama.cpp, slots=concurrency, spec off).
+- TP=2 aggregate record 59.3 @C12 (2026-08-24; C8 is underfed at seqs12 —
+  bench TP=2 aggregates at C12; C16 = upstream deadlock trigger, never).
 - C1 decode record 65.8 tok/s draftable — TP=2 Mia stack post firmware
   refresh (2026-08-24 audit re-record; adversarial 33.4). K2 single-box
   holds 54.1.
@@ -69,6 +71,9 @@ Everything below was measured, not assumed; evidence lives in
 - Over-committing the 128 GB pool = UVM page-migration LIVELOCK (hard hang,
   no log, OOM-killer never fires — why earlyoom can't save it). Prevent, do
   not recover: util <=0.92, leave 10-15 GiB free, never co-load big models.
+- After ANY reboot: COLD-START the TP=2 stack (stop + rm + fresh launcher;
+  GIDs re-resolve). Restart-policy resurrection carries stale RoCE GIDs ->
+  ibv_modify_qp crash-loop (109 restarts, 2026-08-24).
 - NEVER hot-plug the QSFP DAC into a box with a loaded engine: 2026-08-22
   it wedged spark1 (CX7 bring-up allocates against UMA; power-button reset).
   Drain the engine first, or plug with the box cold. Detection at boot is

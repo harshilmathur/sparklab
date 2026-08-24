@@ -3,6 +3,26 @@
 One entry per benchmark session. Newest first. Raw CSVs live in
 `bench/results/`; every claim links its CSV. Pins: [pins.env](../pins.env).
 
+## 2026-08-24 (C12 sweep) — TP=2 aggregate record 59.3 @C12 (+27%); cold-start-after-reboot law
+
+Completed the TP=2 concurrency curve past C8 (settled Mia config, kernel
+1029, adversarial, 3 repeats): C8 47.6 (46.76/47.6/47.87) confirms the
+record; **C12 59.33 (59.26/59.33/59.47) — NEW TP=2 aggregate record,
++27% over the C8 ceiling**, zero errors. The seqs-12 scheduler was
+underfed at C8; C12 is the config's true ceiling (C16 not run: seats cap
+at 12 and 16 is the documented deadlock trigger upstream). Replicas
+still hold the overall crown (136.5).
+
+ALSO (the incident that preceded the sweep): after the kernel-pin
+reboots, docker's restart policy resurrected both TP=2 ranks with STALE
+RoCE GID indexes -> ibv_modify_qp failures -> 109-restart crash-loop.
+LAW: after ANY reboot, the TP=2 stack requires a COLD START (stop +
+rm containers + fresh launcher run, which re-resolves GIDs); never trust
+restart-policy resurrection across reboots. The mini's auto-recovery
+already performs a full cold start — verified correct as deployed.
+CSV: 20260824-152455-tp2-mia-csweep-adversarial.csv.
+
+
 ## 2026-08-24 (final) — Skepticism round: bisect confirmed, timing explained, v0.6.3 verdict in
 
 Challenged our own kernel conviction three ways:
