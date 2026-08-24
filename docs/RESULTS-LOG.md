@@ -3,6 +3,32 @@
 One entry per benchmark session. Newest first. Raw CSVs live in
 `bench/results/`; every claim links its CSV. Pins: [pins.env](../pins.env).
 
+## 2026-08-25 — Peak C1 decode: 89.1 tok/s (Mia methodology), acceptance-driven
+
+User's sparkDash showed ~80 C1; investigated the community/Mia ruler vs
+our conservative median. Mia's headline 82.6 = thinking off, ignore_eos,
+128-tok forced decode, per-stream rate AFTER first token, best content.
+Matched probe (warmed, thinking off, ignore_eos, decode-only, median-of-5)
+sweeping content x length on the official-FP8 TP=2 driver:
+
+| content | 128 | 256 | 512 tok |
+|---|---|---|---|
+| list (highly draftable) | 88.5 | 87.1 | **89.1** |
+| code (realistic) | 69.7 | 66.9 | 73.0 |
+| generic prose | 55.8 | 52.3 | 50.4 |
+
+**PEAK C1 = 89.1 tok/s** (beats Mia's published 82 on our box, their
+ruler). Entirely DSpark-acceptance-driven: predictable sequences draft
+near-perfectly -> near hardware ceiling; realistic code ~73; prose ~52.
+
+REPORTING STANCE: two honest numbers, each labelled.
+- Peak decode (community ruler, best content, warmed): 89 tok/s.
+- Certified record (our closed-loop median, mixed draftable corpus, 3-rep):
+  65.8 tok/s — the defensible, can't-poke-a-hole number.
+Realistic agent/code work lives ~70-73 decode. Probe:
+scratchpad/peak_c1.py (methodology in header).
+
+
 ## 2026-08-24 (C12 sweep) — TP=2 aggregate record 59.3 @C12 (+27%); cold-start-after-reboot law
 
 Completed the TP=2 concurrency curve past C8 (settled Mia config, kernel

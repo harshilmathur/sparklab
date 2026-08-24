@@ -1,7 +1,6 @@
 # The Laws — distilled findings from three weeks on GB10
 
-Everything below was measured, not assumed; evidence lives in
-[RESULTS-LOG.md](RESULTS-LOG.md) with CSVs in `bench/results/`.
+Evidence lives in [RESULTS-LOG.md](RESULTS-LOG.md) with CSVs in `bench/results/`.
 
 ## Verified performance laws (RESULTS-LOG.md has the evidence)
 
@@ -92,6 +91,3 @@ Everything below was measured, not assumed; evidence lives in
 - RESTORE THE DAILY DRIVER before a lane goes idle: 2026-08-17 a paused
   ds4 stayed down ~3 days when an experiment stalled mid-lane. Teardown +
   restore happen in the SAME work session as the experiment, never later.
-
-Note: a few laws reference our internal engine layout (ds4/K2/mini watchdog);
-the mechanisms transfer even where the names don't.

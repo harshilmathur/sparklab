@@ -23,7 +23,9 @@ on real hardware, and the operational laws we learned the hard way.
 
 | Metric | Value | Configuration |
 |---|---|---|
-| Single-stream decode (C1) | **65.8 tok/s** | TP=2, official FP8, DSpark k=5 (median-of-3) |
+| Single-stream decode (C1), peak | **~89 tok/s** | TP=2, best-case draftable content, warmed, decode-only (community ruler) |
+| Single-stream decode (C1), realistic | ~70–73 tok/s | TP=2, real code generation |
+| Single-stream decode (C1), certified | **65.8 tok/s** | median-of-3 across a mixed draftable corpus, closed-loop (our stricter ruler) |
 | Peak aggregate | **136.5 tok/s** | two independent replicas, 12 streams each |
 | TP=2 aggregate | 59.3 tok/s | C12 (seqs-12 config's ceiling; C8 underfeeds it) |
 | One-box aggregate | 69.1 tok/s | llama.cpp, slots = concurrency, spec off |
@@ -32,6 +34,14 @@ on real hardware, and the operational laws we learned the hard way.
 | Context | **1,010,530 tokens retrieved** | TP=2, `nvfp4_ds_mla` KV, 6/6 needle ladder |
 | Quality | **88%** structured-task eval | TP=2 unquantized + per-request thinking (API reference: 86%) |
 | Stability | 24 h soak, 111 cycles, 0 serving failures | survived a mid-soak kernel upgrade |
+
+> **Two rulers, both honest.** Single-stream decode is entirely
+> speculative-decoding-acceptance-driven, so the headline number swings with
+> content and measurement. A highly predictable output hits ~89 tok/s
+> (community methodology: warmed, `ignore_eos`, decode-only, best content);
+> realistic code lands ~70–73; our conservative closed-loop median across a
+> mixed corpus is 65.8. We publish all three. `bench/peak_c1.py` reproduces
+> the peak; the corpus median is the one we defend.
 
 Full history with method, failures, and dead ends: [docs/RESULTS-LOG.md](docs/RESULTS-LOG.md)
 (newest first — the honest version, including everything that did not work).
@@ -86,7 +96,7 @@ python3 bench/agent_bench.py --base-url http://HOST:PORT \
 
 Also here: `quality_eval.py` (14 structured-output scenarios),
 `longctx_probe.py` (needle ladder with usage-exact depths),
-`warm_prefix_probe.py` (prefix-cache verification), `soak.sh` (24 h mixed load).
+`warm_prefix_probe.py` (prefix-cache verification), `peak_c1.py` (peak decode-rate probe, community methodology), `soak.sh` (24 h mixed load).
 Run `python3 bench/test_agent_bench.py` before trusting any harness change.
 
 ## Layout
