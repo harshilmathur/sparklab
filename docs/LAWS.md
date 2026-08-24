@@ -3,7 +3,7 @@
 Everything below was measured, not assumed; evidence lives in
 [RESULTS-LOG.md](RESULTS-LOG.md) with CSVs in `bench/results/`.
 
-## Verified performance laws (docs/results-log.md has the evidence)
+## Verified performance laws (RESULTS-LOG.md has the evidence)
 
 - Box record 69.1 tok/s aggregate (llama.cpp, slots=concurrency, spec off).
 - C1 decode record 65.8 tok/s draftable — TP=2 Mia stack post firmware

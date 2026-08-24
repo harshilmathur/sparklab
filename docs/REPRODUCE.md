@@ -62,14 +62,14 @@ python3 bench/agent_bench.py --base-url http://localhost:8000 \
 Compare your CSV against the golden result in `bench/results/`
 (`20260808-180530-ds4-v0.5.6-adversarial.csv`): C12 median 59.89 tok/s
 aggregate, ±1 tok/s is normal. Protocol details and honest caveats:
-[results-log.md](results-log.md).
+[RESULTS-LOG.md](RESULTS-LOG.md).
 
 ## Notes that save you an hour
 
 - `token_source` in the CSV must say `usage`. If it says `deltas`, your
   engine does not report usage in streams and numbers are NOT comparable.
 - The llama.cpp control lane and its flags are in
-  [results-log.md](results-log.md); readiness is `/health` returning 200 —
+  [RESULTS-LOG.md](RESULTS-LOG.md); readiness is `/health` returning 200 —
   a bare TCP answer means "still loading".
 - Thermals: the box should never throttle (we never saw >77 C / 89 W). If
   `throttle_seen` is not `none`, your numbers are not comparable.
