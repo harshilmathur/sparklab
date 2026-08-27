@@ -27,7 +27,7 @@ on real hardware, and the operational laws we learned the hard way.
 | Single-stream decode (C1), realistic | ~70–73 tok/s | TP=2, real code generation |
 | Single-stream decode (C1), certified | **65.8 tok/s** | median-of-3 across a mixed draftable corpus, closed-loop (our stricter ruler) |
 | Peak aggregate | **136.5 tok/s** | two independent replicas, 12 streams each |
-| TP=2 aggregate | 59.3 tok/s | C12 (seqs-12 config's ceiling; C8 underfeeds it) |
+| TP=2 aggregate | 60.9 tok/s | C12, post OS-tune (seqs-12 ceiling; C8 underfeeds it) |
 | One-box aggregate | 69.1 tok/s | llama.cpp, slots = concurrency, spec off |
 | One-box C1 | 54.1 tok/s | EXL3 ~2-bit, tuned CUDA-graph captures |
 | Warm prefill @32K | ~2,600 tok/s | TP=2 (cold first-touch is 30–60% slower) |
@@ -107,6 +107,7 @@ Run `python3 bench/test_agent_bench.py` before trusting any harness change.
 | [docs/RESULTS-LOG.md](docs/RESULTS-LOG.md) | the full dated log — records, failures, bisects, dead ends |
 | [docs/LAWS.md](docs/LAWS.md) | distilled operational + performance laws |
 | [docs/REPRODUCE.md](docs/REPRODUCE.md) | reproduction guide |
+| [scripts/os-tune-spark.sh](scripts/os-tune-spark.sh) | GB10 OS tuning (headless, core/IRQ pinning, swap) — credit: trenchnotes.blog |
 | [pins.env](pins.env) | every version pin in one file (docs never restate them) |
 
 ## Credits

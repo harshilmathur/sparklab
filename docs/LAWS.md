@@ -1,12 +1,16 @@
 # The Laws — distilled findings from three weeks on GB10
 
-Evidence lives in [RESULTS-LOG.md](RESULTS-LOG.md) with CSVs in `bench/results/`.
+Evidence in [RESULTS-LOG.md](RESULTS-LOG.md) with CSVs in `bench/results/`.
 
 ## Verified performance laws (RESULTS-LOG.md has the evidence)
 
 - Box record 69.1 tok/s aggregate (llama.cpp, slots=concurrency, spec off).
-- TP=2 aggregate record 59.3 @C12 (2026-08-24; C8 is underfed at seqs12 —
-  bench TP=2 aggregates at C12; C16 = upstream deadlock trigger, never).
+- TP=2 aggregate record 60.9 @C12 adversarial (2026-08-26 post OS-tune;
+  was 59.3; C8 underfed at seqs12 — bench at C12; C16 = deadlock, never).
+- OS-tune (scripts/os-tune-spark.sh, per node + reboot): headless +
+  CPU/IRQ pin OS to slow cores 0-4,10-14, vLLM container cpuset to fast
+  5-9,15-19, swappiness=1. Reclaimed idle headroom 3->117 GiB; the GUI was
+  the chronic memory drain. Re-apply after any re-provision.
 - C1 decode record 65.8 tok/s draftable — TP=2 Mia stack post firmware
   refresh (2026-08-24 audit re-record; adversarial 33.4). K2 single-box
   holds 54.1.

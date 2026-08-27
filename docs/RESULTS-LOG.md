@@ -3,6 +3,133 @@
 One entry per benchmark session. Newest first. Raw CSVs live in
 `bench/results/`; every claim links its CSV. Pins: [pins.env](../pins.env).
 
+## 2026-08-26 — OS-tune lane (trenchnotes recipe): +memory, +small aggregate, NEW C12 60.9
+
+Applied the trenchnotes.blog OS optimizations (same Mia recipe, same GB10
+class) to both boxes + a fast-core cpuset on the vLLM container; rebooted.
+5 changes: systemd CPUAffinity 0-4,10-14 (OS on slow cores); IRQ affinity
+NVIDIA/RoCE -> slow cores (verified at runtime); headless multi-user.target;
+swappiness=1 + vfs_cache_pressure=200; container cpuset 5-9,15-19 (fast).
+
+Before/after (kernel 1029, TP=2 official FP8):
+- **Idle memory headroom: 3 GiB -> 117 GiB** (GUI reclaim). The 3-GiB box was
+  chronically at the alert line and TOO STARVED to complete a C8 window (the
+  before-bench literally failed); after, it benches clean.
+- **C12 adversarial aggregate: 59.3 -> 60.9** (60.8/60.87/61.12, 3-rep, TTFT
+  p50 ~680 ms, 0 errors) — NEW TP=2 aggregate record. Plausible mechanism:
+  core+IRQ pinning cuts the SpinCondition-jitter (rank-0's busy-wait no
+  longer shares cores with OS/IRQ noise).
+- C8/C12 draftable: 36.3 / 44.5 (clean, 0 errors).
+
+Honest read: primarily a STABILITY/MEMORY win (headless reclaim is the big
+one), with a modest real aggregate gain. Throughput on GB10 is
+bandwidth-bound so no big tok/s jump expected — and none claimed. Kept all
+changes (beneficial regardless); codified in scripts/os-tune-spark.sh.
+Credit: trenchnotes.blog/post/os-optimizations-dgx-spark.
+CSVs: 20260826-*AFTER-ostune*, *ostune-adv*.
+
+## 2026-08-26 (GLM verification) — Nobody has served GLM-5.3-Flash on Spark; predecessor needed 4 boxes
+
+Direct check "has anyone run GLM-5.3-Flash on Spark": NO verified serving.
+- Only recipe (barrydeen/glm53-flash-dgx-spark) self-labels "starting point
+  to debug from, not guaranteed-working." GB10 NOT vendor-verified; arch not
+  in upstream vLLM (PR #53906 open, no results).
+- Only community datapoint (forum 381350, today): "NVFP4 just landed, first
+  try, 195 GB with vision and mtp" = weights LOADED, not served/benched.
+  Zero tok/s or quality numbers exist.
+
+Predecessor GLM-5.2 (the cautionary signal — shares the hard parts):
+- Needs FOUR Sparks (TP=4, full 753B). Best published: 22-49 tok/s aggregate
+  (single ~15-27) after a "nine walls" custom-kernel campaign (rebuilt vLLM,
+  Marlin fixes, portable Triton sparse-MLA).
+- KEY: "DFlash/DSpark: no GLM drafter exists" and "native FP4 GEMM
+  hardware-REJECTS sm_121a" (W4A4-NVFP4-via-Marlin = slower + garbage). The
+  speculation multiplier we live on is absent for GLM; FP4 fights GB10.
+
+FIRMER VERDICT: GLM-5.3-Flash is STRUCTURALLY wrong for our 2-box fleet
+(predecessor needed 4; 5.3 is bigger 320B/18B-active; no drafter; GB10 NVFP4
+kernel walls). Even once it serves, expect ~18-24 tok/s vs our 65-89. DO NOT
+pursue. Qwen3.8-Flash-Next remains the only watch-worthy candidate.
+Sources: barrydeen/glm53-flash-dgx-spark, forum 381350/374125/377879,
+drowzeys GLM-5.2 4x-Spark recipe (nine-walls doc), vLLM PR #53906.
+
+## 2026-08-26 (deep dive) — Qwen: TWO models, only one is new; GLM immature. Full picture.
+
+CRITICAL DISTINCTION the threads blur:
+- **Qwen3.8-27B** (older, MATURE): 27B dense-ish MoE, vision+reasoning, 256K.
+  Heavily tested on Spark. SGLang + NVFP4 + DFlash2 spec decode (lossless).
+  hasso5703/dgx-spark-qwen38 + MiaAI-Lab recipe: **50 tok/s greedy single
+  (code 41-47, math 60), 148 @8 / 258 @32 aggregate, HumanEval 97%,
+  tool-eval 92.3**. MiaAI's contribution = the quantized-lm_head fix that
+  makes DFlash2 safe on GB10. Runs on ONE Spark (17-24 GB NVFP4).
+  BUT: 27B is a SMALLER weight class than our DS4F (284B/13B-active) — fast
+  and proven, but not a quality upgrade over what we serve.
+- **Qwen3.8-Flash-Next** (NEW today, the 125B Qwen4 preview): this is what
+  the question was about.
+
+Qwen3.8-Flash-Next findings:
+- Unsloth day-0 GGUFs + KLD analysis. Their claim: "**outperforms
+  Claude-4.6-Opus (Max)**"; 80% top-1 recovery at 1-bit (75 GB), 93% at
+  Q4 (111 GB). Ngram/PLE table offloads to SSD via mmap.
+- **Could run on ONE Spark** (75 GB 1-bit / 90 GB 3-bit / 111 GB Q4) — a
+  real differentiator vs our two-box DS4F. 6B active = fast once it fits.
+- BUT: llama.cpp PR #27742 still OPEN (Unsloth's own fork branch needed);
+  vLLM can't offload the Ngram table to disk yet; NO drafter/DFlash2 for
+  it (grafting spec decode onto a multimodal checkpoint is "tricky"); ZERO
+  DGX-Spark throughput numbers published yet (hours old).
+
+VERDICT for our setup (revised):
+- GLM-5.3-Flash: skip. 18B active, no spec, GB10 not vendor-verified.
+- Qwen3.8-27B: proven & fast BUT smaller than DS4F — a downgrade in
+  capability, not worth swapping our certified stack.
+- **Qwen3.8-Flash-Next: THE one to watch.** If the "beats Opus" quality
+  holds AND a drafter appears, a 125B/6B-active that fits ONE Spark could
+  genuinely reshape our fleet (frees the 2nd box). Hold ~1 week for: (a)
+  llama.cpp PR merge, (b) first Spark tok/s numbers, (c) a spec-decode
+  draft. THEN bake off vs DS4F (65.8 C1 / 88% / 1M). Quant target: Q4_K_XL
+  (111 GB, 93% recovery) fits one Spark with room for KV.
+
+Sources: unsloth.ai/docs/models/qwen3.8-next (KLD table, Opus claim),
+hasso5703/dgx-spark-qwen38, MiaAI-Lab/Qwen3.8-27B-SGLang-DGX-Spark, forum
+381228 (Flash-Next) + 380732 (27B DFlash2), llama.cpp PR #27742.
+
+## 2026-08-26 — Landscape scan: GLM-5.3-Flash & Qwen3.8-Flash-Next for our 2x Spark (both released today)
+
+Mission is DeepSeek-only; this is an explicit user-requested view, not an
+adoption. Neither tested — assessment from specs + day-0 community reports.
+
+GLM-5.3-Flash (zai-org): 320B total / **18B active**, multimodal MoE,
+glm5_next arch. NVFP4 weight-only ~181-195 GB -> needs TP=2 (2x Spark).
+Community loaded NVFP4 "first try, 195GB w/ vision+mtp" today.
+- NOT in upstream vLLM (PR #53906 open); per-model image only.
+- GB10 NOT on vendor's verified list (H100/B200/GB200); kernel-gap risk.
+- No DSpark/drafter yet -> no speculation multiplier.
+- 18B active > DS4F 13B => SLOWER decode on our bandwidth-bound box
+  (more bytes/token). Without a drafter, expect ~raw decode 20-30 tok/s.
+- VERDICT FOR US: worse active-param profile, no speculation, immature
+  tooling. WATCH, don't chase.
+
+Qwen3.8-Flash-Next (Alibaba, Qwen4 arch preview): 125B main / **6B active**
++ 51B n-gram embeddings (offloadable to host/SSD) + 4B MTP head. GDN+QSA
+hybrid attn, 262K native / 1M via YaRN, multimodal. Qwen Community License.
+- **Day-0 vLLM** (PR #53896), SGLang, Unsloth GGUF. FP8 ~180 GB -> fits
+  TP=2 FP8 across the pair.
+- **6B active << DS4F 13B => potentially FASTER single-stream** (half the
+  bytes/token on a bandwidth-bound box) — the one genuinely interesting
+  angle for us.
+- **Has a 4B MTP head** -> speculative decoding possible (the DSpark-style
+  multiplier that gets us to 65-89 could apply here too).
+- Caveats: vLLM can't offload the n-gram table to disk yet (needs 2x Spark,
+  not 1x); quality vs DS4F unproven; not Apache license; we don't need the
+  vision.
+- VERDICT FOR US: the ONE worth a real eval IF we ever add a control arm —
+  faster active-param profile + MTP + day-0 vLLM. Hold ~1 week for the 2x
+  Spark recipe + quants to stabilize (the usual community pattern), then a
+  bake-off vs our certified DS4F numbers (65.8 C1 / 88% quality / 1M).
+
+Sources: barrydeen/glm53-flash-dgx-spark, cellcog/byteiota Qwen writeups,
+NVIDIA forum threads 381350 (GLM) + 381228 (Qwen), vLLM PRs 53896/53906.
+
 ## 2026-08-25 — Peak C1 decode: 89.1 tok/s (Mia methodology), acceptance-driven
 
 User's sparkDash showed ~80 C1; investigated the community/Mia ruler vs
