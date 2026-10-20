@@ -129,7 +129,7 @@ P0 findings so far:
 - Our fabric adaptations: NODES/MASTER <lan-ip>/11, HCA
   rocep1s0f1,roceP2p1s0f1, NET_IF enp1s0f1np1, port 8888; precheck
   adapted (gid path rocep1s0f1, rail-2 ping via enP2p1s0f1np1 /
-  192.168.200.x). GID 3 confirmed RoCE v2 on our HCA.
+  <lan-prefix>.x). GID 3 confirmed RoCE v2 on our HCA.
 - Deferred to the window (co-location law): engine build (~2 min, no
   GPU), rank caches (~6 min/rank, I/O heavy), runtime model dir.
 Driver stays up throughout P0.
