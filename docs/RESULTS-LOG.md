@@ -3,6 +3,383 @@
 One entry per benchmark session. Newest first. Raw CSVs live in
 `bench/results/`; every claim links its CSV. Pins: [pins.env](../pins.env).
 
+## 2026-10-20 — LANE E VERDICT: DeepSeek-V4.1-Flash-1017 (TensorFold TP2) beats DS4F on every certified axis
+
+Full battery on our harness (usage tokens, 3 repeats, zero errors; CSVs
+20261020-*dsv41*). Stack: tonyd2wild run 2026-10-18-1017-tensorfold-tp2 on
+our fabric, LibertAIDAI 1017 EXL3 2.9 bpw @9a85740a, Engram shards local,
+TensorFold Zig 3ff3b2a + 5940208 + patches 0002/0003, drafts on, thinking
+off by default (on per request with reasoning_effort "high").
+
+| Metric | V4.1 TensorFold | DS4F (record) |
+|---|---|---|
+| C1 decode draftable (3 rep) | **91.5** | 65.8 |
+| C1 decode adversarial (3 rep) | **54.9** | 33.4 |
+| Peak C1 (community ruler) | **128.8** (code 94.7, prose 70-76) | 89 (code ~73, prose ~52) |
+| Aggregate, 4 single-turn streams | **221.8** (56-60/stream) | 60.9 @C12 (TP=2) |
+| Multi-turn closed-loop C4 (agent_bench) | 32.2 draftable / 62.8 adversarial | 60.9 (C12 adv) |
+| TTFT C1 | **0.17-0.39 s** | ~0.68 s |
+| Quality, thinking off | **83%** | 73% |
+| Quality, thinking on | **98%** (= Qwen record) | 88% (API 86) |
+| Needle | found 127K/254K/496K/**992K** | 1,010,530 |
+| Cold prefill | **2,231 @127K -> 1,618 @992K** (1M in 613 s) | ~1,800 @32K -> 1,198 @419K |
+| Warm prefix (22.6K) | cold 10.2 s -> warm **1.5 s** (20,480 cached) | 32K warm ~seconds |
+| Load | **27 s** | ~15 min |
+| Weights | 2.9 bpw EXL3 (quality holds at 98) | unquantized FP8 |
+
+Caveats: engine is days old (TensorFold Zig branch; tony's "GB10 slow
+state" issue #1 unobserved here but open); no 24 h soak yet; thinking is
+a per-request string knob (reasoning_effort "high"; the int form 400s);
+multi-turn aggregate is prefill-bound per turn (page-granular prefix
+cache helps: 20,480/22,588 cached); watchdog not yet aware of this lane;
+2.9 bpw quant vs our unquantized driver (quality says it does not matter).
+
+RULING REQUESTED: adopt as daily driver (after a 24 h soak + watchdog
+re-point) or keep DS4F. Lane left SERVING for the user's own testing;
+DS4F not restored; watchdog held by the pause flag loop.
+
+## 2026-10-20 — LANE E SERVING: DeepSeek-V4.1-Flash-1017 on TensorFold TP2 across both Sparks
+
+05:36 UTC: served name deepseek-v4.1-flash on :8888, identity-checked,
+smoke OK (150 tok). Both RDMA rails up (gid_index=3, path_mtu=5), model
+105.04 GiB per node, rank cache 95.1 GiB read in 8.7 s, 4 streams, drafts
+on, thinking off by default. Engine built from bertholomus/TensorFold
+deepseek-v41-zig @3ff3b2a + cherry-pick 5940208 + tony patches 0002/0003;
+kit = HF copy + Range-built 1017 bias (verify 220/221); pack
+LibertAIDAI 1017 EXL3 2.9bpw @9a85740a; Engram shards local on both.
+
+Two more window-2 fixes: (1) head self-ssh over its fabric IP needed a
+known_hosts entry (precheck/serve ssh BatchMode to the head itself);
+(2) the pack's chat_template.jinja uses **kwargs (line 207), which
+TensorFold's Jinja rejects -> replaced with tony's 10-17 template
+(sha c282975e) on both nodes; pack original kept as
+chat_template.pack.jinja.
+
+Battery launched (sequential, on-box, journal /tmp/lane-e-battery.log):
+agent_bench C1+C4 both corpora x3 -> peak_c1 -> quality (think-off and
+reasoning_effort=75) -> needle ladder 128K/256K/500K/1M.
+
+## 2026-10-20 — Lane E window 1 failed at precheck (watchdog re-launched DS4F mid-window); fixed; rerun in flight
+
+Window 1 (10-19 08:52 UTC): drain OK (116 GiB), engine built in 2 min (16
+binaries), both rank caches built (106 GB each) and rank 1 copied to spark2,
+then PRECHECK FAILED: spark2 MemAvailable 31 GiB. Cause: donna's watchdog
+re-launched DS4F between drain and precheck. The TTL pause flag was set
+but the watchdog's pause CHECK ran `ssh spark1` as donna's own user, which
+cannot reach spark1 (alias: host-key failure; FQDN: permission denied) ->
+empty result -> treated as not paused -> recovery fired. The supervisor
+also reported a false STABLE (it saw DS4F on :8888 before the drain; no
+identity check), and my session waiter had no timeout, so the failed
+window sat unnoticed ~20 h with DS4F serving. Fleet was safe throughout.
+
+Fixes (deployed, committed): pause check uses the SAME ssh target as the
+recovery path (<user>@<spark-host>) and is verified from
+donna ("fresh"); unreachable check = skip recovery (fail-safe); supervisor
+health requires the lane's served name; waiters carry timeouts.
+
+Mia also published a V4.1-1017 TensorFold 2x recipe (one-command start.sh,
+her EAQ 2.9 bpw pack, 512K default): 55-61 C1 on bench prompts, 113-117
+@4, ~2,000 prefill, needle at 479K 3/3. Same engine family as tony's run;
+tony's numbers are higher, so Lane E stays on tony's config (already
+built). Her pack is a follow-up candidate, not a switch.
+
+## 2026-10-19 — Lane E P0 (cont.): download laws learned the hard way
+
+- SIGSTOP pause trap: pausing downloads with kill -STOP to protect a
+  driver reload is fine, but EVERY stopped process must get -CONT; my
+  resume missed the curls and the Engram transfer sat in state T for an
+  hour looking like a server stall. Check `ps -o stat` before diagnosing.
+- NVRM NV_ERR_NO_MEMORY appeared on both boxes during driver reloads
+  while a 93 MB/s download filled the page cache (UMA). The watchdog
+  recovered it. Mitigation that worked: 60 s drop_caches loop on spark1
+  for the whole staging period + pausing downloads during a reload.
+  LAW: large downloads beside a loaded engine need the drop_caches loop.
+- hf_transfer saturates the link (~750 Mbps) and starves single-stream
+  curls (Zig tarball at 0 B for 30 min, Engram at 0 MB/s). Stage
+  sequentially or fetch small files first.
+- Xet-only large files (the 101 GB Engram shards): hf's Xet path hung at
+  335 MB; single curl -C - works but is fragile; a stdlib parallel-range
+  downloader with per-chunk resume (scripts/pget.py) runs 85 MB/s on 8
+  workers. Adopted for any Xet-only file > 10 GB.
+- ssh commands containing pkill killed their own session (exit 255) three
+  times; kill $(pgrep -f "patter[n]") did not. Use that form.
+- setup.sh runs from the lane BASE dir, not src/ (cost one Zig misplace).
+  Engine source now at 3ff3b2a + cherry-pick 5940208 + patches 0002/0003
+  (0001 is the cherry-pick itself; git am --skip it).
+
+## 2026-10-19 — LANE E opened: DeepSeek-V4.1-Flash-1017 on TensorFold TP2 (P0 staging)
+
+User ruling: go. Target = tonyd2wild run 2026-10-18-1017-tensorfold-tp2
+(C1 84.2 per stream, code 105.6, needle at 1M, tool-eval 97.1, load 27 s
+on 2x GB10). All sources pinned in pins.env (DSV41_*). Bandwidth law: all
+internet downloads on spark1 only; spark2 gets image + Engrams over the
+DAC; the worker's rank cache is built on spark1 and copied.
+
+P0 findings so far:
+- The base-checkpoint Engram shards (2 x 101 GB) are Xet-only on HF; the
+  hf CLI's Xet path hung at 335 MB (known). HTTP Range works on the
+  resolve URLs (206), so the shards download with a resumable curl loop
+  (~100 MB/s). Law candidate: for Xet-only large files, curl -C - beats
+  hf_xet on these boxes.
+- The 1017 vision bias file needs 43 tensors spread over 43 base shards
+  (430 GB). Built it byte-exact via HTTP Range (header + tensor bytes
+  only): 43 tensors, 67,192 bytes, sha256 4745da4b..., 11 MB of traffic.
+  Kit (HF copy, prebuilt cubins, RoPE tables) verifies 220/221 with the
+  1017 bias as the one expected difference (tony: 222/223).
+- Our fabric adaptations: NODES/MASTER <lan-ip>/11, HCA
+  rocep1s0f1,roceP2p1s0f1, NET_IF enp1s0f1np1, port 8888; precheck
+  adapted (gid path rocep1s0f1, rail-2 ping via enP2p1s0f1np1 /
+  192.168.200.x). GID 3 confirmed RoCE v2 on our HCA.
+- Deferred to the window (co-location law): engine build (~2 min, no
+  GPU), rank caches (~6 min/rank, I/O heavy), runtime model dir.
+Driver stays up throughout P0.
+
+## 2026-10-19 — Fleet back from the Indic loan; SM clock cap 2100 MHz adopted as standing insurance
+
+Inditrain handed both boxes back (HANDOFF-inditrain-2026-10-19.md). Their
+report: hard power resets under peak GPU draw on 10-06 and 10-14 (three in
+one hour, both boxes together then singly, no kernel error). A 2.1 GHz SM
+cap (nvidia-smi -lgc 208,2100) gave 5 clean training days. They removed
+the cap at handoff.
+
+User ruling: apply the cap on both boxes permanently. Rationale: our own
+law (2026-08-23) says a clock cap costs <2% decode because GB10 decode is
+bandwidth-bound; the reset risk is a hardware-level outage. Installed as
+systemd unit gpu-clock-cap.service (oneshot, enabled, survives reboots).
+Note for the record book: numbers from here on run under the cap; a
+re-measure of C1 at the cap is a cheap future check (expected delta <2%).
+
+Also at handoff: the Indic session's driver restart wedged (shm spin);
+recycled with a cold start; watchdog re-armed after health.
+
+## 2026-09-05 — FLEET HANDOFF: both Sparks to the Indic post-training programme (multi-day/weeks)
+
+User ruling (option 1 of 3): DeepSeek-V4-Flash TP=2 daily driver taken
+DOWN; both boxes loaned to the Indic programme (repo ~/code/inditrain,
+docs/SPARKS.md; Gemma 4 31B bf16 parity via vLLM, GRPO dry run, LoRA RL
+specialists one per box). Contact to free a box: Claude session "Indic
+post-training project". Their commitments: bandwidth law honoured (one-box
+download + DAC rsync), kernel/driver pins untouched, nothing of ours on
+disk modified.
+
+Done here: driver drained cleanly on both ranks (recipe stop script + worker
+stop; port 8888 free). Watchdog: unload was BLOCKED by session permissions —
+parked via the TTL pause flag (/tmp/watchdog-pause on spark1) refreshed by
+the Indic session's loop; Harshil to run the launchctl unload on donna for a
+proper multi-day park. Record book unchanged. Restore = runbook-qwen-swap.md
+"Switch BACK to DS4F" block + re-arm watchdog.
+
+## 2026-09-02 — Deep-prefill datapoint: 419K cold TTFT 5.8 min (1,198 tok/s), warm 1.3 s
+
+Community question ("TTFT at 500K?") answered with a measurement instead
+of extrapolation. Live TP=2 driver, single request, needle-verified:
+- COLD at 418,915 tokens: TTFT 350 s (5.8 min), 1,198 tok/s sustained
+  prefill, retrieval CORRECT. (Estimator undershot 500K by ~16%; scaled
+  500K cold ~= 7 min.)
+- WARM (cached prefix, same depth): TTFT **1.3 s**.
+Confirms the warm-prefix law at record depth: sessions pay the deep
+prefill once; every later turn at depth is seconds. Deepest measured
+cold-prefill point on the stack (prior: 370K ~5.5 min).
+
+## 2026-09-02 — LANE D VERDICT: Vision-Exp PARKED (wedges at fabric byte-parity); 0731 stays driver
+
+Final attempt (5, genuine — an earlier "STABLE" was a false positive: the
+drain silently failed via the pkill -f self-match trap AGAIN and the
+supervisor certified the still-running 0731 on :8888; served-model
+IDENTITY check now mandatory in all verdicts): fabric env at verified
+byte-parity with the working 0731 stack, clean drain, port-free
+confirmed. Result: shm_broadcast wedge, 100 spin lines, zero prior
+errors. Wedge is 2-for-2 on Vision-Exp at parity (attempts 3, 5) while
+0731 cold-boots clean on the identical env — this is a VISION-EXP boot
+issue on our boxes, not config. Env exonerated by render-diff.
+
+Attempt ledger: 1-2 placeholder iface/IP (env-merge blind spots), 3
+wedge, 4 Gloo pair-connect (empty NCCL_IB_GID_INDEX — found by
+render-diff), 5 wedge at parity. Supervisor auto-restored the driver
+after every failure; wedge-recycle branch failed to trigger (bash bug,
+unresolved — acceptable, restore path worked every time).
+
+PARKED. Weights (157G, rev 86f746b3 validated pin) + recipe + parity env
+stay staged on both boxes. Re-open triggers: (a) Mia's tracker gets a
+Vision-Exp multi-node boot-wedge fix (her fix cadence is hours-days), or
+(b) recipe rev bump. Retry cost when triggered: one supervisor-armed
+window. 0731 remains daily driver; nothing about the record book changes.
+
+Session learnings burned in: pkill -f self-match (4th incident — the law
+now says -x or bracketed patterns ONLY), served-model identity in every
+health verdict, remote-rank log capture still TODO in supervisor.
+
+## 2026-09-02 — Lane D root-caused by env render-diff: NCCL_IB_GID_INDEX was empty
+
+After 4 failed Vision-Exp windows (2x placeholder-iface/IP rendezvous
+hangs, 1x known shm wedge, 1x Gloo pair-connect refusal), applied the
+systematic method instead of serial debugging: captured the WORKING 0731
+driver's container env (both ranks) via docker inspect, rendered the vexp
+compose env, diffed. Result: EXACTLY ONE variable differed —
+**NCCL_IB_GID_INDEX=3 (working) vs empty (vexp)**. The example env ships
+the key absent; my env merge only appended missing keys and only patched
+XsYfZ-style placeholders; an ABSENT key is invisible to both. Empty GID
+on our RoCE fabric = wrong GID entry = the whole failure zoo.
+
+METHOD ADOPTED (faster than any single autopsy): when a stack of the
+same recipe family fails where a sibling works, diff the effective
+container envs first. Ground truth beats log forensics.
+
+Note: does NOT explain the GLM cross-stack deaths (tonyd2wild's launcher
+hardcodes GID_INDEX=3 and still died) — that mystery stands.
+
+Attempt 5 launched with render-diff-verified byte-parity on all fabric
+vars. Supervisor now: wedge-recycle-once + local log capture (remote
+capture still TODO).
+
+## 2026-09-01 — Lane C retry (tonyd2wild stack) also blocked; ~13-min death signature now CROSS-STACK; supervisor pattern adopted
+
+Retry per the 08-31 trigger, on tonyd2wild's stack (all 5 GB10 patches
+incl NCCL 2.30.7 — our previous killer — baked into prebuilt image
+sm121-v11-dflash2; RedHatAI corruption-free NVFP4 @36c184c6; recipe
+@3eef4663; our f1/f1 fabric + HF-cache mount adaptations).
+
+Mechanical fixes this window: exec bit on copied launcher (cost 40 min —
+check exit codes), HF-cache symlinks don't survive bind mounts (mount
+hub ROOT so relative blob links resolve; point --model at snapshots/SHA),
+hardcoded --chat-template path. Engine then progressed to load and DIED
+~13 MIN post-launch, container exited — logs lost (supervisor removed
+before capture; now fixed to snapshot logs first).
+
+KEY OBSERVATION: ~13-min-post-launch death now seen on TWO different
+stacks (Mia EXL3 vLLM image AND tonyd2wild patched image). Different
+NCCL versions, different quants, different attention backends — shared
+factors are OUR environment: twin-port CX7 f1/f1 GID layout
+(NCCL_IB_GID_INDEX=3 assumptions), OS-tune cpuset/IRQ pinning, or UMA
+pressure profile. Next debug session should START there, not in the
+recipes (both recipes are proven on their authors' fleets).
+
+OPS: session-bound watchers FAILED us (orphaned by session restarts;
+fleet sat dead ~13h overnight). Fix ADOPTED: on-box eval-supervisor
+(scripts/eval-supervisor.sh) — watches lane, 21-min hold, auto-restores
+DS4F on death/timeout, journals to /tmp/eval-state. It caught this
+failure at 06:36 and restored the driver autonomously. STANDING RULE:
+no experiment window opens without the on-box supervisor armed.
+
+RULING: Lane C parked (2 stacks tried). GLM weights/images/recipes stay
+staged. Re-open trigger: a debugging session focused on OUR fabric/GID
+config, or a community report of the 2-node recipe working on f1/f1
+wiring. 3-way remains a 2-way; DS4F driver restored; watchdog re-armed.
+
+## 2026-08-31 — LANE C VERDICT: GLM-5.3-Flash EXL3 BLOCKED on our environment (10 attempts, capped)
+
+Mia recipe 4676496e + brandonmusic tr3-4bpw @5ab363a8 + DFlash2 drafter
+@bf582e4e (all pinned, all staged both boxes — 164G + drafter on disk,
+swap-ready if the recipe matures).
+
+Failure chain (each fixed, strictly descending into the boot):
+1. .env overrides exports (recipe reads .env AFTER env) -> wrote .env
+2. worker .env missing -> created
+3. PATH lacks ~/.local/bin under setsid -> wrapper export
+4. DFlash2 drafter not staged; HF_HUB_OFFLINE correctly blocked the
+   silent unpinned fetch -> downloaded + pinned
+5. 900K ctx needs 13.9 GiB KV > free at util 0.87 -> raised
+6. util 0.90 > CUDA-visible startup free (108.6) -> narrow window found
+7. util 0.89: PASSES memory, dies in NCCL init (rank1 heartbeat,
+   "cancelled") -> full container clean: SAME
+8. Both-box REBOOT + cold start: server came UP (health after 510s,
+   DFlash2 k=7 active, banner printed) then EngineDead at +13min —
+   same NCCL heartbeat signature DURING serving
+9. USE_HOST_NCCL=1 (host 2.31.2 vs image-bundled; house floor is
+   >=2.30.7 on this fabric): "Executor failed" at init. CAPPED.
+
+Diagnosis: the recipe's vLLM image's NCCL/distributed layer is unstable
+on our f1<->f1 DAC topology (their kit is f1<->f0). Fabric exonerated:
+DS4F (Anemll vLLM) and Qwen (SGLang) both run clean TP=2 on the same
+wire. Not fixable from outside the image without rebuild work that
+exceeds a complement-candidate's budget.
+
+RULING: Lane C BLOCKED — revisit when the recipe/image gets a rev bump
+(watch MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks commits). Weights
+stay staged. The 3-way ships as a 2-way + this appendix. NO upstream
+report (user ruling); failure chain preserved here for when we retry.
+DS4F restored as daily driver; watchdog re-armed post-restore.
+
+## 2026-08-28 — LANE A VERDICT: Qwen3.8-Flash-Next dual-Spark (Mia SGLang, NVFP4)
+
+Full eval per docs/qwen-flash-next-eval-plan.md. All numbers our harness,
+usage tokens, clean environment (one contaminated run discarded — donna
+watchdog auto-recovered DS4F mid-bench; watchdog now paused during lane
+swaps, added to runbook). Recipe f87d586e, checkpoint 7b719225.
+
+| Metric | Qwen FN (NVFP4) | DS4F (official FP8) |
+|---|---|---|
+| quality (our 14-scenario, think on) | **98% — ALL-TIME RECORD** | 88 (API 86) |
+| quality think off | **90%** | 73 |
+| C12 aggregate | **64-82 (med ~70/76)** | 60.9 |
+| C1 closed-loop decode | 25-33 | **65.8** |
+| C1 decode-window, code, think off | 47.4 | **~70-73 (peak 89)** |
+| TTFT p50 C12 | **~550-660ms** | ~680ms |
+| needle | found 64K/107K/167K/209K (ceiling 262K) | **1,010,530** |
+| cold prefill at depth | **~1,620 tok/s @209K** (QSA) | ~1,100 @370K |
+| warm prefill 32K | (probe lacks extra-body; TODO) | 2,600 |
+| soak 6x8min C4 | **PASS: 35.5->43.8 rising, mem flat 17GiB, 0 err** | 24h certified |
+| spec acceptance | 1.8 mixed / 3.9 code (NEXTN, content-shaped) | 68% steady |
+
+Notes: thinking ON costs ~30% speed but +8pts quality (INVERSE of DS4F
+where thinking is the quality switch too — both models: think for quality).
+All-fail needle run was a HARNESS artifact (thinking ate answer budget;
+longctx_probe needs --extra-body; task filed). Gloo iface fix needed:
+recipe assumes worker f0 port, our DAC is f1/f1 (wrapper pins
+WORKER_CX7_IF=enp1s0f1np1).
+
+VERDICT vs pre-committed criteria: quality 98>=85 PASS, C1 47<55 FAIL,
+soak PASS -> not "challenger" by the letter. Actual shape: **quality king
++ aggregate king + prefill king; single-stream half of DS4F; context
+1/4 of DS4F.** Ruling: COMPLEMENT candidate — strongest brain on the
+fleet, slower pen, smaller window. DS4F remains daily driver (mission +
+C1 + 1M + maturity). Decision on standing role deferred until Lane C
+(GLM-5.3 EXL3) completes the 3-way.
+
+## 2026-08-28 — GLM-5.3-Flash gets a DFlash2 drafter (incoai): verdict DON'T-PURSUE -> WATCH
+
+incoai/GLM-5.3-Flash-DFlash2 released 08-27 (same z-lab/Inco team whose
+Qwen3.8-27B DFlash2 is GB10-proven). Lossless block-diffusion drafter,
+BEATS GLM's native MTP everywhere (acceptance 4.85-5.86 vs 4.26-5.06;
+2.4-2.8x C1 speedup vs autoregressive on 4x GB300 TP4). License CC
+BY-NC-ND (research OK). No Flash-Next drafter in their lineup yet.
+
+Impact on our math: GLM raw ~15-22 on GB10 (18B active) x DFlash2 ->
+optimistic ~35-50 C1 — no longer hopeless, still under DS4F 65.8-89, and
+their numbers used TRT-LLM DSA kernels GB10 lacks.
+
+Still blocking: SGLang PR #36708 unmerged (no GB10 image); NOBODY has
+served GLM-5.3 on any Spark; drafter trained vs BF16 target — acceptance
+vs the NVFP4 quant (~90 GiB/node, leaves ~29 for KV+draft) unverified.
+
+RULING: watch item. Trigger for a Lane C eval: a working 2-Spark GLM-5.3
+recipe with this drafter clearing ~45 tok/s C1. Qwen Flash-Next eval
+(in flight) is unaffected — Mia's NEXTN lane stays Lane A.
+
+## 2026-08-28 — Qwen3.8-Flash-Next deep research: 4 working Spark configs in 48h; eval plan written
+
+Day-2 landscape (sources: forum 381228, MiaAI-Lab/Qwen3.8-Flash-Next-Dual-
+DGX-Sparks, x00byte dual recipe, blazux single-Spark vLLM, 0xBakeer
+llama.cpp; llama.cpp PR #27742 MERGED 08-27):
+- **Mia dual-Spark SGLang NVFP4: 64.4 C1 / 117 agg @x2** (NEXTN 3/1/4,
+  NVFP4 KV -> 2.85M-token pool, vision works, retrieval OK to 128K).
+  Statistically at parity with our DS4F 65.8 — on day 1.
+- x00byte dual vLLM: ~55 C1, MTP=4, tool-eval-bench 91/100, eager-only.
+- Single-Spark vLLM (PLE->NVMe mmap): 27 C1 w/MTP, prefill 2.4-2.7K.
+- Single-Spark llama.cpp Q4: 19-22 base / 45-88 copy-heavy; concurrency
+  crashes; no QSA kernel (dense prefill ~600).
+- Model card: beats DS4F on SWE-bench Pro (62.5/56.0), CoWorkBench
+  (73.9/45.1), Toolathlon (73.5/70.3); loses NL2Repo + ALE pass@1.
+- Caveats: all 2-box lanes are NVFP4 quant (FP8 needs 4 boxes: 38 C1);
+  torch.compile broken on GB10 (eager everywhere); 262K ctx vs our 1M;
+  speed strongly task-shaped (n-gram acceptance swings 3x).
+
+EVAL PLAN written: docs/qwen-flash-next-eval-plan.md (user-directed
+exception to DeepSeek-only). Lane A = Mia dual recipe vs our full harness
+(agent_bench/quality/longctx/peak/soak), Lane B = one-box vLLM if A's
+quality passes. Verdict criteria pre-committed. DS4F stays daily driver
+regardless until a challenger survives 24h soak + a week of maturity.
+
 ## 2026-08-26 — OS-tune lane (trenchnotes recipe): +memory, +small aggregate, NEW C12 60.9
 
 Applied the trenchnotes.blog OS optimizations (same Mia recipe, same GB10

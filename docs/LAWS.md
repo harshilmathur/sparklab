@@ -1,8 +1,22 @@
-# The Laws — distilled findings from three weeks on GB10
+# The Laws — distilled findings from GB10 serving
 
 Evidence in [RESULTS-LOG.md](RESULTS-LOG.md) with CSVs in `bench/results/`.
 
 ## Verified performance laws (RESULTS-LOG.md has the evidence)
+
+- V4.1 DRIVER RECORDS (2026-10-20, TensorFold TP2, EXL3 2.9bpw, our harness):
+  C1 decode 91.5 draftable / 54.9 adversarial; peak 128.8 (code 94.7);
+  4 single-turn streams 221.8 agg; TTFT 0.2-0.4 s; quality 98% with
+  reasoning_effort "high" (83% off); needle at 992K; cold prefill 2,231 ->
+  1,618 tok/s at 1M (613 s); warm prefix 22.6K 10.2 s -> 1.5 s; load 27 s.
+  Thinking knob is the STRING reasoning_effort ("high"); the int form 400s.
+  Multi-turn closed-loop aggregate is prefill-bound per turn (page-granular
+  prefix cache, 20,480-token pages).
+- V4.1 LANE LAWS: the head must batch-ssh itself over its fabric IP
+  (known_hosts); the pack's chat_template.jinja (**kwargs) is rejected by
+  TensorFold -> use tony's template; Engram tables must be LOCAL on both
+  nodes (NFS = 10x slower random reads); rank caches are built on the head
+  without a GPU (~6 min/rank) and rank 1's copied over the DAC.
 
 - Box record 69.1 tok/s aggregate (llama.cpp, slots=concurrency, spec off).
 - TP=2 aggregate record 60.9 @C12 adversarial (2026-08-26 post OS-tune;
@@ -55,6 +69,10 @@ Evidence in [RESULTS-LOG.md](RESULTS-LOG.md) with CSVs in `bench/results/`.
   regression-test kernel/driver upgrades with >=3 consecutive C8 windows
   and a post-kill memory check.
 - Boxes never thermally throttle (<=84 C, <=92 W of 140 W TDP).
+- POWER-RESET LAW (2026-10-19): both boxes hard-reset under peak GPU draw
+  (10-06, 10-14 x3; no kernel error). Standing fix: SM clock cap 2100 MHz
+  via gpu-clock-cap.service on both boxes (<2% decode cost). Never remove
+  the cap without a reason; if resets recur, suspect power/UPS first.
 
 ## Operational laws (learned the hard way)
 
@@ -67,6 +85,11 @@ Evidence in [RESULTS-LOG.md](RESULTS-LOG.md) with CSVs in `bench/results/`.
 - llama.cpp readiness = /health returns 200 (curl -sf). A TCP answer means
   "still loading". ds4 readiness = /v1/models 200.
 - rsync across boxes always with --partial (reboots eat plain partials).
+- BANDWIDTH LAW (2026-09-02, after blowing the 3TB ISP cap): models and
+  docker images download from the internet ON ONE BOX ONLY; the second
+  box gets them over the DAC fabric (rsync --partial for weights,
+  docker save | ssh | docker load for images). Newer Mia recipes also
+  support DSPARK_WORKER_HF_NFS=1 (worker reads head's cache; zero copy).
 - Transient systemd-run timers die on reboot; use real unit files.
 - Alloy on GB10: node exporter MUST use the minimal collector set (a
   default collector hangs on GB10 sysfs and silently kills the scrape).

@@ -1,0 +1,3 @@
+answer,cached_tokens,engine,phase,prompt_tokens,target_tokens,timestamp_utc,wall_s
+4,0,dsv41-tf,cold,22590,32000,2026-10-20T06:46:18.077260+00:00,10.2
+The supervisor filed the reports.,20480,dsv41-tf,warm,22588,32000,2026-10-20T06:46:19.535036+00:00,1.5

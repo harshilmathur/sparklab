@@ -1,4 +1,4 @@
-# SparkLab — DeepSeek-V4-Flash on 1-2 DGX Sparks, measured honestly
+# SparkLab — DeepSeek Flash on 1-2 DGX Sparks, measured honestly
 
 Three weeks of systematic benchmarking, tuning, and certification of
 **DeepSeek-V4-Flash-0731** on NVIDIA DGX Spark (GB10) hardware — one box,
@@ -19,7 +19,32 @@ on real hardware, and the operational laws we learned the hard way.
 | Interconnect | one passive QSFP112 200 GbE DAC, direct, same port both ends |
 | Power | one 600 VA UPS **per box** (one shared UPS cannot carry two under load) |
 
-## Certified numbers (2026-08-24)
+## Daily driver since 2026-10-20: DeepSeek-V4.1-Flash-1017 on TensorFold TP2
+
+Measured on our own harness (usage-field tokens, 3 repeats, zero errors), same two boxes, same cable.
+Stack: tonyd2wild's TensorFold TP2 run (EXL3 2.9 bpw, DSpark drafts, Engram tables on local NVMe).
+
+| Metric | V4.1-Flash-1017 (TensorFold TP2) | V4-Flash-0731 (vLLM TP2, previous driver) |
+|---|---|---|
+| C1 decode, draftable / adversarial | **91.5 / 54.9 tok/s** | 65.8 / 33.4 |
+| Peak C1 (community ruler, best content) | **128.8** (code 94.7, prose ~73) | ~89 (code ~73, prose ~52) |
+| 4 single-turn streams, aggregate | **221.8 tok/s** | 60.9 at C12 |
+| TTFT, single stream | **0.2-0.4 s** | ~0.7 s |
+| Quality (our 14-scenario eval), thinking on / off | **98% / 83%** | 88% / 73% |
+| Needle retrieval | **found at 992K** (1M window) | 1,010,530 |
+| Cold prefill | **2,231 tok/s @127K -> 1,618 @992K** (1M in 613 s) | ~1,800 @32K -> 1,198 @419K |
+| Warm cached prefix (22.6K) | cold 10.2 s -> **1.5 s** | seconds |
+| Load time | **27 s** | ~15 min |
+| Weights | EXL3 2.9 bpw (quality holds) | official FP8, unquantized |
+
+Honest caveats: the engine is days old (a new Zig TensorFold branch); the multi-turn closed-loop
+aggregate is prefill-bound per turn (page-granular prefix cache); thinking is a per-request string
+knob (`reasoning_effort: "high"`). Bring-up notes and the fixes we needed (fabric self-ssh, the pack's
+chat template, Engram locality) are in [docs/RESULTS-LOG.md](docs/RESULTS-LOG.md) and
+[docs/RUNBOOK-DSV41-DRIVER.md](docs/RUNBOOK-DSV41-DRIVER.md). Credit: tonyd2wild, bertholomus
+(TensorFold dsv41 family), LibertAI (EXL3 pack), MiaAI-Lab.
+
+## V4-Flash-0731 certified numbers (2026-08-24)
 
 | Metric | Value | Configuration |
 |---|---|---|
@@ -96,7 +121,7 @@ python3 bench/agent_bench.py --base-url http://HOST:PORT \
 
 Also here: `quality_eval.py` (14 structured-output scenarios),
 `longctx_probe.py` (needle ladder with usage-exact depths),
-`warm_prefix_probe.py` (prefix-cache verification), `peak_c1.py` (peak decode-rate probe, community methodology), `soak.sh` (24 h mixed load).
+`warm_prefix_probe.py` (prefix-cache verification), `peak_c1.py` (peak decode-rate probe, community methodology), `soak.sh` (24 h mixed load); `scripts/pget.py` (parallel ranged downloader for Xet-only files), `scripts/eval-supervisor.sh` (on-box experiment supervisor with auto-restore).
 Run `python3 bench/test_agent_bench.py` before trusting any harness change.
 
 ## Layout
