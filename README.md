@@ -39,12 +39,14 @@ tables on local NVMe). The previous driver is in the right-hand column.
 | Cold prefill | **2,231 tok/s at 127K, 1,618 at 992K** (1M in 613 s) | ~1,800 at 32K, 1,198 at 419K |
 | Warm cached prefix, 22.6K tokens | cold 10.2 s, **warm 1.5 s** | seconds |
 | Load time | **27 s** | ~15 min |
+| Stability | **24 h soak, 112 cycles, 336 windows, 0 failures** (2026-10-27) | 24 h soak, 111 cycles, 0 failures |
 | Weights | EXL3 2.9 bpw (quality holds at 98%) | official FP8, unquantized |
 
 Caveats, stated plainly: the engine is days old (a new Zig TensorFold branch);
 multi-turn closed-loop aggregate is bound by per-turn prefill (the prefix cache
 is page-granular); thinking is a per-request string knob (`reasoning_effort:
-"high"`, the integer form is rejected). A 24 h soak is in progress. The bring-up
+"high"`, the integer form is rejected). A 24 h soak completed clean on 2026-10-27
+(112 cycles, 336 windows, 0 failures; single-stream medians held). The bring-up
 notes and the fixes we needed (head self-ssh over the fabric, the pack's chat
 template, Engram locality) are in [docs/RESULTS-LOG.md](docs/RESULTS-LOG.md) and
 [docs/RUNBOOK-DSV41-DRIVER.md](docs/RUNBOOK-DSV41-DRIVER.md).

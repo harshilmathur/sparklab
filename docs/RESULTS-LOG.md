@@ -3,6 +3,19 @@
 One entry per benchmark session. Newest first. Raw CSVs live in
 `bench/results/`; every claim links its CSV. Pins: [pins.env](../pins.env).
 
+## 2026-10-27 — V4.1 driver 24 h soak certified: 112 cycles, 336 windows, 0 failures, no reset
+
+The stock DeepSeek-V4.1-Flash-1017 TensorFold TP2 driver ran a full
+uninterrupted 24 h soak (engine tag dsv41-tf-tp2, 2026-10-26 06:58 to
+2026-10-27 07:00 UTC): 112 cycles, 336 fixed-window measurements, 0 soak
+failures, 0 request errors, no host reset, SM clock lock held throughout.
+Single-stream decode medians over the 24 h were 91.9 tok/s (draftable) and
+54.6 (adversarial), within 1% of the day-one records, so there was no
+degradation under sustained alternating load. Available host memory drifted
+about 0.5 GB over the run; logged as a watch item. Log
+`bench/results/soak-20261026-065849-dsv41-tf-tp2.log`, CSVs in
+`bench/results/soak/`.
+
 ## 2026-10-20 — LANE E VERDICT: DeepSeek-V4.1-Flash-1017 (TensorFold TP2) beats DS4F on every certified axis
 
 Full battery on our harness (usage tokens, 3 repeats, zero errors; CSVs
